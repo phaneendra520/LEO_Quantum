@@ -20,7 +20,7 @@ version: "1.0.0"
 date-released: "2026-04-01"
 license: CC-BY-4.0
 repository-code: "https://github.com/phaneendra520/leo-q-framework"
-url: "https://doi.org/10.5281/zenodo.XXXXXXXX"
+url: "https://doi.org/10.5281/zenodo.19560596"
 keywords:
   - quantum computing
   - QAOA
@@ -32,14 +32,3 @@ keywords:
   - capital markets
   - .NET
   - C#
-references:
-  - type: article
-    title: >
-      Leo-Q: Quantum-Secured Low Earth Orbit Satellite Network for
-      High-Frequency Trading and Real-Time Portfolio Optimization
-    authors:
-      - family-names: Yerra
-        given-names: Phaneendra Vayu Kumar
-    journal: "IEEE Access"
-    year: 2026
-    notes: "Manuscript ID 2026-10381, under review"
