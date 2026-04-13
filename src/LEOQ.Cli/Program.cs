@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using LEOQ.Core.Crypto;
+using LEOQ.Core.Experiments;
 using LEOQ.Core.Metrics;
 using LEOQ.Core.Routing;
 using LEOQ.Core.Sim;
@@ -28,11 +29,16 @@ internal static class Program
         {
             return cmd switch
             {
-                "bench" => RunBench(opt),
-                "dataset" => RunDataset(opt),
-                "backtest" => RunBacktest(opt),
-                "crypto-demo" => RunCryptoDemo(opt),
-                _ => Unknown(cmd),
+                "bench"        => RunBench(opt),
+                "dataset"      => RunDataset(opt),
+                "backtest"     => RunBacktest(opt),
+                "crypto-demo"  => RunCryptoDemo(opt),
+                "qaoa"         => RunQAOA(opt),
+                "exp-qae"      => RunQaeExperiment(opt),
+                "exp-latency"  => RunLatencyExperiment(opt),
+                "exp-qkd"      => RunQkdExperiment(opt),
+                "run-all"      => RunAllExperiments(opt),
+                _              => Unknown(cmd),
             };
         }
         catch (Exception ex)
@@ -51,45 +57,44 @@ internal static class Program
 
     private static void PrintHelp()
     {
-        Console.WriteLine("LEO-Q CLI");
+        Console.WriteLine("LEO-Q Quantum Simulation Framework");
         Console.WriteLine();
+
         Console.WriteLine("Usage:");
         Console.WriteLine("  dotnet run --project src/LEOQ.Cli -- <command> [options]");
         Console.WriteLine();
-        Console.WriteLine("Commands:");
-        Console.WriteLine("  bench        Compare routing policies over random pairs");
-        Console.WriteLine("  dataset      Generate CSV dataset for ML training");
-        Console.WriteLine("  backtest     Run toy trading backtest influenced by network delay");
-        Console.WriteLine("  crypto-demo  Demonstrate QKD/PQC stubs using SecureSession");
+        Console.WriteLine("Core Commands:");
+        Console.WriteLine("  bench        Compare routing policies (BaselineRouter vs LatencyAware vs RiskAware)");
+        Console.WriteLine("  dataset      Generate CSV dataset of LEO routing samples");
+        Console.WriteLine("  backtest     Run toy trading backtest with network latency influence");
+        Console.WriteLine("  crypto-demo  Demonstrate QKD/PQC stub session encryption");
+        Console.WriteLine("  qaoa         Run QAOA portfolio optimization (Exp 1 — main paper result)");
         Console.WriteLine();
-        Console.WriteLine("Common options:");
-        Console.WriteLine("  --sats <int>         Number of satellites (default 24)");
-        Console.WriteLine("  --ring <int>         Ring links per node (default 1)");
-        Console.WriteLine("  --chords <int>       Random chord links (default 0)");
-        Console.WriteLine("  --seed <int>         Random seed (optional)");
+        Console.WriteLine("Quantum Experiments:");
+        Console.WriteLine("  exp-qae      Experiment 2: QAE vs Classical MC VaR convergence speedup");
+        Console.WriteLine("  exp-latency  Experiment 3: LEO multi-hop latency budget (H=1..6 vs fiber)");
+        Console.WriteLine("  exp-qkd      Experiment 4: Satellite QKD key rate and session rekeying model");
+        Console.WriteLine("  run-all      Run all four experiments and export all results to --out");
         Console.WriteLine();
-        Console.WriteLine("bench options:");
-        Console.WriteLine("  --pairs <int>        Number of random src/dst pairs (default 20)");
+        Console.WriteLine("Common Options:");
+        Console.WriteLine("  --sats <int>     Number of satellites (default 24)");
+        Console.WriteLine("  --seed <int>     Random seed for reproducibility (default 42)");
+        Console.WriteLine("  --out  <path>    Output directory (default ./results)");
         Console.WriteLine();
-        Console.WriteLine("dataset options:");
-        Console.WriteLine("  --samples <int>      Rows to generate (default 1000)");
-        Console.WriteLine("  --out <path>         Output CSV path (default data/leoq_dataset.csv)");
-        Console.WriteLine();
-        Console.WriteLine("backtest options:");
-        Console.WriteLine("  --steps <int>        Price steps (default 2000)");
-        Console.WriteLine("  --every <int>        Submit order every N steps (default 10)");
+        Console.WriteLine("QAOA Options:");
+        Console.WriteLine("  --layers <int>   QAOA layers P (default 2)");
+        Console.WriteLine("  --shots  <int>   Measurement shots (default 4096)");
     }
 
     private static (Graph G, Random Rnd) BuildDefaultGraph(Args opt)
     {
-        var sats = opt.Int("sats", 24);
-        var ring = opt.Int("ring", 1);
+        var sats   = opt.Int("sats", 24);
+        var ring   = opt.Int("ring", 1);
         var chords = opt.Int("chords", 0);
-        var seed = opt.TryInt("seed");
+        var seed   = opt.TryInt("seed");
 
         var g = TopologyBuilder.BuildRingMesh(sats, ringLinks: ring);
         if (chords > 0) TopologyBuilder.AddRandomChords(g, chords, seed);
-
         LatencyModel.AttachSyntheticLinkAttributes(g, seed: seed);
 
         var rnd = seed.HasValue ? new Random(seed.Value) : new Random();
@@ -108,7 +113,7 @@ internal static class Program
             new RiskAwareRouter(degreePenaltyWeight: 0.10),
         };
 
-        var ids = g.Nodes.Keys.ToArray();
+        var ids     = g.Nodes.Keys.ToArray();
         var results = new Dictionary<string, List<double>>();
         foreach (var r in routers) results[r.Name] = new List<double>();
 
@@ -116,21 +121,18 @@ internal static class Program
         {
             var src = ids[rnd.Next(ids.Length)];
             var dst = ids[rnd.Next(ids.Length)];
-            if (src.Equals(dst, StringComparison.OrdinalIgnoreCase))
-            {
-                i--; continue;
-            }
+            if (src.Equals(dst, StringComparison.OrdinalIgnoreCase)) { i--; continue; }
 
             foreach (var r in routers)
             {
                 var path = r.Route(g, src, dst);
-                var d = LatencyModel.PathDelayMs(g, path, includeJitter: true, seed: rnd.Next());
+                var d    = LatencyModel.PathDelayMs(g, path, includeJitter: true, seed: rnd.Next());
                 results[r.Name].Add(d);
             }
         }
 
         Console.WriteLine("Routing Benchmark Summary (ms)");
-        Console.WriteLine($"Satellites: {g.Nodes.Count}, Pairs: {pairs}");
+        Console.WriteLine($"Satellites: {g.Nodes.Count}  Pairs: {pairs}");
         Console.WriteLine();
 
         foreach (var kv in results)
@@ -153,15 +155,13 @@ internal static class Program
         var outPath = opt.String("out", Path.Combine("data", "leoq_dataset.csv"));
 
         var router = new LatencyAwareRouter();
-        var rows = DatasetGenerator.Generate(g, router, samples, seed: opt.TryInt("seed"));
+        var rows   = DatasetGenerator.Generate(g, router, samples, seed: opt.TryInt("seed"));
 
-        Csv.WriteRows(
-            outPath,
+        Csv.WriteRows(outPath,
             header: new[] { "hops", "distance_km", "delay_ms" },
-            rows: rows.Select(r => new object[] { r.Hops, r.DistanceKm, r.DelayMs }));
+            rows:   rows.Select(r => new object[] { r.Hops, r.DistanceKm, r.DelayMs }));
 
-        Console.WriteLine($"Dataset written: {outPath}");
-        Console.WriteLine($"Rows: {rows.Count}");
+        Console.WriteLine($"Dataset written: {outPath}  ({rows.Count} rows)");
         return 0;
     }
 
@@ -171,53 +171,117 @@ internal static class Program
         var steps = opt.Int("steps", 2000);
         var every = opt.Int("every", 10);
 
-        // Generate price series
         var prices = MarketFeed.GenerateRandomWalk(steps, seed: opt.TryInt("seed"));
-
-        // Sample delays from latency-aware routes
         var router = new LatencyAwareRouter();
-        var ids = g.Nodes.Keys.ToArray();
+        var ids    = g.Nodes.Keys.ToArray();
         var delays = new List<double>();
+
         for (var i = 0; i < 200; i++)
         {
             var src = ids[rnd.Next(ids.Length)];
             var dst = ids[rnd.Next(ids.Length)];
-            if (src.Equals(dst, StringComparison.OrdinalIgnoreCase))
-            {
-                i--; continue;
-            }
+            if (src.Equals(dst, StringComparison.OrdinalIgnoreCase)) { i--; continue; }
 
             var path = router.Route(g, src, dst);
-            var d = LatencyModel.PathDelayMs(g, path, includeJitter: true, seed: rnd.Next());
+            var d    = LatencyModel.PathDelayMs(g, path, includeJitter: true, seed: rnd.Next());
             delays.Add(Math.Max(0.0, d));
         }
 
         var (_, summary) = Backtester.Run(prices, delays, orderEvery: every);
 
         Console.WriteLine("Trading Impact Summary");
-        Console.WriteLine($"Orders: {summary.Orders}");
-        Console.WriteLine($"Avg delay (ms): {summary.AvgDelayMs:F4}");
-        Console.WriteLine($"Avg slippage (abs): {summary.AvgSlippageAbs:F6}");
-        Console.WriteLine($"Avg slippage (%): {summary.AvgSlippagePct * 100.0:F6}%");
-        Console.WriteLine($"VaR 99 (demo): {summary.Var99:F6}");
-
+        Console.WriteLine($"Orders          : {summary.Orders}");
+        Console.WriteLine($"Avg delay (ms)  : {summary.AvgDelayMs:F4}");
+        Console.WriteLine($"Avg slippage    : {summary.AvgSlippageAbs:F6} abs  ({summary.AvgSlippagePct * 100.0:F6}%)");
+        Console.WriteLine($"VaR 99 (demo)   : {summary.Var99:F6}");
         return 0;
     }
 
     private static int RunCryptoDemo(Args opt)
     {
-        var msg = opt.String("msg", "Hello from LEO-Q secure session");
-        var key = QkdStub.GenerateSharedKey(lengthBytes: 32, seed: opt.TryInt("seed"));
+        var msg     = opt.String("msg", "Hello from LEO-Q secure session");
+        var key     = QkdStub.GenerateSharedKey(lengthBytes: 32, seed: opt.TryInt("seed"));
         var session = new SecureSession(key);
 
         var c = session.Protect(msg);
         var p = session.Unprotect(c);
 
-        Console.WriteLine("Crypto Demo (STUBS ONLY)");
+        Console.WriteLine("QKD Crypto Stub Demo");
         Console.WriteLine($"Plain : {msg}");
         Console.WriteLine($"Cipher: {c}");
         Console.WriteLine($"Back  : {p}");
+        return 0;
+    }
 
+    private static int RunQAOA(Args opt)
+    {
+        var layers    = opt.Int("layers", 2);
+        var shots     = opt.Int("shots", 4096);
+        var outputDir = opt.String("out", "./results");
+        var seed      = opt.TryInt("seed");
+
+        var simulator = new QAOASimulator(qaoapLayers: layers, shots: shots, seed: seed);
+        simulator.Run(outputDir);
+        return 0;
+    }
+
+    private static int RunQaeExperiment(Args opt)
+    {
+        var outDir = opt.String("out", "./results");
+        var rows   = QaeVarConvergenceExperiment.Run();
+        QaeVarConvergenceExperiment.ExportCsv(Path.Combine(outDir, "qae_var_convergence.csv"), rows);
+        return 0;
+    }
+
+    private static int RunLatencyExperiment(Args opt)
+    {
+        var outDir = opt.String("out", "./results");
+        var rows   = LeoLatencyAnalysisExperiment.Run();
+        LeoLatencyAnalysisExperiment.ExportCsv(Path.Combine(outDir, "leo_latency_budget.csv"), rows);
+        return 0;
+    }
+
+    private static int RunQkdExperiment(Args opt)
+    {
+        var outDir = opt.String("out", "./results");
+        var rows   = QkdKeyRateExperiment.Run();
+        QkdKeyRateExperiment.ExportCsv(Path.Combine(outDir, "qkd_key_rate_model.csv"), rows);
+        return 0;
+    }
+
+    private static int RunAllExperiments(Args opt)
+    {
+        var outDir = opt.String("out", "./results");
+        Console.WriteLine("================================================================");
+        Console.WriteLine("  LEO-Q: Running All Four Quantum Experiments");
+        Console.WriteLine("  Output directory: " + outDir);
+        Console.WriteLine("================================================================");
+
+        // Experiment 1: QAOA Portfolio Optimization
+        Console.WriteLine("\n--- Experiment 1: QAOA Portfolio Optimization ---");
+        var sim = new QAOASimulator(qaoapLayers: opt.Int("layers", 2),
+                                    shots: opt.Int("shots", 4096),
+                                    seed: opt.TryInt("seed"));
+        sim.Run(outDir);
+
+        // Experiment 2: QAE VaR Convergence
+        Console.WriteLine("\n--- Experiment 2: QAE vs Classical MC VaR Convergence ---");
+        var qaeRows = QaeVarConvergenceExperiment.Run();
+        QaeVarConvergenceExperiment.ExportCsv(Path.Combine(outDir, "qae_var_convergence.csv"), qaeRows);
+
+        // Experiment 3: LEO Latency Budget
+        Console.WriteLine("\n--- Experiment 3: LEO Multi-Hop Latency Budget ---");
+        var latRows = LeoLatencyAnalysisExperiment.Run();
+        LeoLatencyAnalysisExperiment.ExportCsv(Path.Combine(outDir, "leo_latency_budget.csv"), latRows);
+
+        // Experiment 4: QKD Key Rate Model
+        Console.WriteLine("\n--- Experiment 4: Satellite QKD Key Rate Model ---");
+        var qkdRows = QkdKeyRateExperiment.Run();
+        QkdKeyRateExperiment.ExportCsv(Path.Combine(outDir, "qkd_key_rate_model.csv"), qkdRows);
+
+        Console.WriteLine("\n================================================================");
+        Console.WriteLine("  All experiments complete. Results written to: " + outDir);
+        Console.WriteLine("================================================================");
         return 0;
     }
 }
@@ -225,7 +289,6 @@ internal static class Program
 internal sealed class Args
 {
     private readonly Dictionary<string, string> _kv;
-
     private Args(Dictionary<string, string> kv) => _kv = kv;
 
     public static Args Parse(string[] args)
@@ -236,7 +299,8 @@ internal sealed class Args
             var a = args[i];
             if (!a.StartsWith("--", StringComparison.Ordinal)) continue;
             var key = a[2..];
-            var val = (i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal)) ? args[++i] : "true";
+            var val = (i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                      ? args[++i] : "true";
             kv[key] = val;
         }
         return new Args(kv);
@@ -244,10 +308,8 @@ internal sealed class Args
 
     public string String(string key, string defaultValue)
         => _kv.TryGetValue(key, out var v) ? v : defaultValue;
-
     public int Int(string key, int defaultValue)
         => _kv.TryGetValue(key, out var v) && int.TryParse(v, out var i) ? i : defaultValue;
-
     public int? TryInt(string key)
         => _kv.TryGetValue(key, out var v) && int.TryParse(v, out var i) ? i : null;
 }

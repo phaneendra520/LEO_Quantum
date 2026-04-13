@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "Leo-Q: Quantum-Secured LEO Satellite Network — .NET Simulation Framework"
+abstract: >
+  Reference implementation of the Leo-Q quantum simulation framework supporting
+  the paper "Leo-Q: Quantum-Secured Low Earth Orbit Satellite Network for
+  High-Frequency Trading and Real-Time Portfolio Optimization" (IEEE Access,
+  Manuscript ID 2026-10381). Provides four reproducible quantum experiments:
+  QAOA portfolio optimization, QAE vs Monte Carlo VaR convergence analysis,
+  LEO multi-hop latency budget analysis, and satellite QKD key rate modelling.
+  All computation is performed via classical simulation of quantum circuits
+  using .NET 8.
+authors:
+  - family-names: Yerra
+    given-names: Phaneendra Vayu Kumar
+    affiliation: "Bank of America, Dallas, Texas, USA"
+    orcid: "https://orcid.org/0009-0006-9165-3331"
+version: "1.0.0"
+date-released: "2026-04-01"
+license: CC-BY-4.0
+repository-code: "https://github.com/phaneendra520/leo-q-framework"
+url: "https://doi.org/10.5281/zenodo.XXXXXXXX"
+keywords:
+  - quantum computing
+  - QAOA
+  - quantum amplitude estimation
+  - LEO satellite networks
+  - high-frequency trading
+  - quantum key distribution
+  - portfolio optimization
+  - capital markets
+  - .NET
+  - C#
+references:
+  - type: article
+    title: >
+      Leo-Q: Quantum-Secured Low Earth Orbit Satellite Network for
+      High-Frequency Trading and Real-Time Portfolio Optimization
+    authors:
+      - family-names: Yerra
+        given-names: Phaneendra Vayu Kumar
+    journal: "IEEE Access"
+    year: 2026
+    notes: "Manuscript ID 2026-10381, under review"
