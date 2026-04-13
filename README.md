@@ -225,17 +225,6 @@ If you use this software in your research, please cite:
 }
 ```
 
-Associated paper:
-```bibtex
-@article{yerra2026leoq,
-  author  = {Yerra, Phaneendra Vayu Kumar},
-  title   = {Leo-Q: Quantum-Secured Low Earth Orbit Satellite Network for
-             High-Frequency Trading and Real-Time Portfolio Optimization},
-  journal = {IEEE Access},
-  year    = {2026},
-  note    = {Manuscript ID 2026-10381, under review}
-}
-```
 
 ---
 
