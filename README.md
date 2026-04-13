@@ -1,6 +1,6 @@
 # Leo-Q: Quantum-Secured LEO Satellite Network — Simulation Framework
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXXX.svg)](10.5281/zenodo.18752219)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19560597.svg)](10.5281/zenodo.19560597)
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-blue)](https://dotnet.microsoft.com)
 
@@ -219,7 +219,7 @@ If you use this software in your research, please cite:
   title     = {{Leo-Q: Quantum-Secured LEO Satellite Network — .NET Simulation Framework}},
   year      = {2026},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.18752219},
+  doi       = {10.5281/zenodo.19560597},
   url       = {https://github.com/phaneendra520/leo-q-framework}
 }
 ```
