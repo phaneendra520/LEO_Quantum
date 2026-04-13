@@ -220,7 +220,7 @@ If you use this software in your research, please cite:
   title     = {{Leo-Q: Quantum-Secured LEO Satellite Network — .NET Simulation Framework}},
   year      = {2026},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.19560536},
+  doi       = {10.5281/zenodo.18752219},
   url       = {https://github.com/phaneendra520/leo-q-framework}
 }
 ```
